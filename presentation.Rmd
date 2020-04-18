@@ -14,10 +14,11 @@ library(htmltools)
 library(ggplot2)
 library(gganimate)
 library(plotly)
+library(forecast)
 
 #FUNCTION: Number formatting and rounding
-formatNum<-function(number){
-      format(round(as.numeric(number),2),nsmall=1, big.mark = " ")
+formatNum<-function(number,precision=2){
+    format(round(as.numeric(number),precision),nsmall=precision, big.mark = " ")
 }
 #Replace vectors
 rc<-c("cases"="Cases","deaths"="Deaths","ratioDC"="Deaths/Cases ratio","ratioCP"="Cases/1000people ratio")
@@ -38,64 +39,62 @@ setnames(data,"countriesAndTerritories","country")
 grtu <- 3
 setkey(data,dateRep)
 # Computing cumulative sums and ratios:
-d<-data[,':='(Cumulative.Cases=cumsum(cases),Cumulative.Deaths=cumsum(deaths),
+d<-data[,':='(CCases=cumsum(cases),CDeaths=cumsum(deaths),
                             pop=popData2018[1]),
-        by=country][Cumulative.Cases>10,':='(GrowthRate= (Cumulative.Cases-shift(Cumulative.Cases,n=grtu))/(shift(Cumulative.Cases,n=grtu)-shift(Cumulative.Cases,n=2*grtu)),
-                                        Cumulative.RatioDC=100*Cumulative.Deaths/Cumulative.Cases,
-                                        Cumulative.RatioCP=1000*Cumulative.Cases/popData2018[1]), 
+        by=country][CCases>10,':='(GrowthRate= (CCases-shift(CCases,n=grtu))/(shift(CCases,n=grtu)-shift(CCases,n=2*grtu)),
+                                        Cumulative.RatioDC=100*CDeaths/CCases,
+                                        Cumulative.RatioCP=1000*CCases/popData2018[1]), 
                     by=country][,':='(countryterritoryCode=NULL,geoId=NULL)]
 ```
 
-## R Markdown
+## Basics
 
 - Over **2 million** people infected so far.
-- Around 140.000 confirmed **deaths**
+- ~ 140.000 confirmed **deaths**
 - 213 affected **countries**
-- 80% of cases are **asymptomatic**
+- ~20% of cases need **in-hospital care**
 
 ## Most cases relative to the population
 
-```{r, echo=T}
-mostcases<-d[dateRep==max(dateRep) & Cumulative.Cases>6,][
-      order(-Cumulative.Cases),head(.SD,15)][,.(country,Cumulative.Cases,pop,Cumulative.RatioCP)]
-mostcases
+```{r, echo=T, eval=F}
+mostcases <- 
+  d[dateRep==max(dateRep) & CCases>6,][
+    order(-CCases),head(.SD,15)][
+      ,.(country,CCases,pop)]
+head(mostcases)
 ```
 
+```{r, echo=F, eval=T}
+mostcases<-d[dateRep==max(dateRep) & CCases>6,][
+      order(-CCases),head(.SD,15)][,.(country,CCases,pop)]
+head(data.frame(Country=mostcases$country,"Cumulative Cases"=formatNum(mostcases$CCases,0),
+                Population=formatNum(mostcases$pop,0)))
+```
 
 ## Countries with exponential growth
 
 ```{r, warning=F}
 topfive<-d[country %in% mostcases$country,][order(dateRep),]
-p<-ggplot(topfive,aes(x=Cumulative.Cases, y=cases, color=country)) +
-  geom_point(aes(size=pop)) + 
-  geom_text(aes(label=country)) +
-  scale_x_continuous(trans='log2')+
-  # scale_color_viridis_d()+
-  scale_y_continuous(trans='log2')+
+p<-ggplot(topfive,aes(x=CCases, y=ma(cases,3))) +
+  geom_point(aes(size=pop), color="red") + 
+  geom_text(aes(label=country), color="black") +
+  scale_x_continuous(trans='log2') +
+  scale_y_continuous(trans='log2') +
   ggtitle("Trajectory of COVID-19 Confirmed Cases") +
   xlab("Cumulative case count") +
-  ylab("New case count")+
-  transition_time(dateRep)+
+  ylab("New case count") +
+  theme(legend.position="none") +
+  transition_time(dateRep) +
   labs(subtitle="Date: {frame_time}") +
-  shadow_mark(wake_length = 0.05,alpha=F, size=0.5)
-animate(p, fps=15,duration=18)
+  shadow_mark(alpha=0.6, size=0.5, color="grey", exclude_layer = 2)
+animate(p, fps=15,duration=20)
 ```
 
-## Deaths - cases plot
-```{r, warning=F}
-plot_ly(d[dateRep==max(dateRep) & Cumulative.Cases>50,][order(-pop),head(.SD,80)], type = 'scatter', mode = 'markers',
-        x=~log(1+Cumulative.RatioCP), y=~log(1+Cumulative.RatioDC), color=~country, size=~pop, hoverinfo='text', 
-        sizes = c(10, 70), marker = list(sizemode = 'diameter'),
-        text=~paste(country,
-                    '<br>Population:',
-                    format(pop,big.mark=" "),
-                    '<br>Cumulative cases:',
-                    format(Cumulative.Cases,big.mark=" "),
-                    '<br>Cumulative deaths:',
-                    format(Cumulative.Deaths,big.mark=" "))) %>%
-      layout(title="relative deaths ~ rel. cases (size=population)",
-             xaxis=list(title="Relative case count (log cases/1000 ppl)",showgrid = FALSE),
-             yaxis=list(title="Relative death count (log deaths/100 cases)",showgrid = FALSE),
-             showLegend=F)
-```
-
+## Shiny app
+ - **Map**
+ - **Trajectory:** effective preventive measures?
+    - the no. of new cases fall in several countries
+    - *like Korea, China, Japan, Switzerland, Norway, Australia, Taiwan...*
+ - **Deaths/Cases:** effective healthcare system?
+    - healthcare systems that experienced a large exponential growth, were overloaded with cases
+    - → increased deaths/cases rate

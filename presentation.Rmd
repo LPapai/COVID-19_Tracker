@@ -1,5 +1,5 @@
 ---
-title: "COVID19 cases"
+title: "COVID19"
 author: "LPapaiMD"
 date: '2020 04 17 '
 output: ioslides_presentation
@@ -90,11 +90,11 @@ p<-ggplot(topfive,aes(x=CCases, y=ma(cases,3))) +
 animate(p, fps=15,duration=20)
 ```
 
-## Shiny app
- - **Map**
+## Shiny app - COVID19 tracker
+ - **Map:** fullscreen map, minimalist design, draggable control panel
  - **Trajectory:** effective preventive measures?
-    - the no. of new cases fall in several countries
-    - *like Korea, China, Japan, Switzerland, Norway, Australia, Taiwan...*
+    - the no. of new cases fall in several countries after implementing preventive measures
+    - *such as Korea, China, Japan, Switzerland, Norway, Australia, Taiwan...*
  - **Deaths/Cases:** effective healthcare system?
     - healthcare systems that experienced a large exponential growth, were overloaded with cases
     - → increased deaths/cases rate
